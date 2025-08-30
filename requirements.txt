@@ -3,3 +3,4 @@ networkx==3.4.2
 matplotlib==3.9.2
 qrcode[pil]==8.0
 Pillow==10.4.0
+gunicorn==21.2.0
