@@ -2,144 +2,110 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>关系网络</title>
+    <title>兴趣网络图</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #f0f2f5; }
-        #graph { width: 100vw; height: 100vh; }
-        .link { fill: none; stroke: #999; stroke-opacity: 0.6; }
-        .link-label { font-size: 14px; font-weight: bold; fill: #333; }
-        .node { cursor: pointer; }
-        .node circle { stroke: #fff; stroke-width: 2px; }
-        .node text { font-size: 14px; font-weight: bold; }
+        /* 可加 network 图美化 */
+        button { margin:8px; padding:6px 18px; }
+        .link-label { font-size:12px; fill:#ff661a; pointer-events:none; }
     </style>
 </head>
 <body>
-    <div id="graph"></div>
     <div style="margin-bottom: 18px;">
-        <button @click="networkType='province';loadNetwork()" :disabled="networkType==='province'">按省份</button>
-        <button @click="networkType='interest';loadNetwork()" :disabled="networkType==='interest'">按兴趣</button>
+        <button onclick="changeNetwork('province')" id="btn-province">按省份</button>
+        <button onclick="changeNetwork('interest')" id="btn-interest">按兴趣</button>
     </div>
     <div id="graph"></div>
     <script>
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        let networkType = 'province';
+        function changeNetwork(type) {
+            networkType = type;
+            document.getElementById('btn-province').disabled = (type === 'province');
+            document.getElementById('btn-interest').disabled = (type === 'interest');
+            loadNetwork();
+        }
+        function loadNetwork() {
+            d3.json('/data?type=' + networkType).then(function(graph) {
+                d3.select("#graph").selectAll("*").remove(); // 清空
+                const width = window.innerWidth, height = window.innerHeight-60;
+                const svg = d3.select("#graph")
+                    .append("svg").attr("width", width).attr("height", height);
 
-        const svg = d3.select("#graph")
-            .append("svg")
-            .attr("width", width)
-            .attr("height", height);
+                const g = svg.append("g");
+                const simulation = d3.forceSimulation(graph.nodes)
+                    .force("link", d3.forceLink(graph.links).id(d => d.id).distance(150))
+                    .force("charge", d3.forceManyBody().strength(-480))
+                    .force("center", d3.forceCenter(width/2, height/2));
 
-        const g = svg.append("g");
+                // 连线
+                const link = g.append("g")
+                    .attr("stroke", "#999").attr("stroke-opacity", 0.6)
+                    .selectAll("line")
+                    .data(graph.links).enter()
+                    .append("line").attr("stroke-width",2);
 
-        // 添加缩放功能
-        const zoom = d3.zoom()
-            .scaleExtent([0.1, 8])
-            .on("zoom", (event) => {
-                g.attr("transform", event.transform);
+                // 连线上的标签
+                const linkLabel = g.append("g")
+                    .selectAll("text")
+                    .data(graph.links)
+                    .enter()
+                    .append("text")
+                    .attr("class","link-label")
+                    .text(d=>d.label);
+
+                // 节点
+                const node = g.append("g")
+                    .selectAll("circle")
+                    .data(graph.nodes).enter()
+                    .append("circle")
+                    .attr("r", 22).attr("fill", "#69b3a2")
+                    .call(d3.drag()
+                        .on("start", dragstarted)
+                        .on("drag", dragged)
+                        .on("end", dragended));
+
+                // 标签
+                g.append("g").selectAll("text")
+                    .data(graph.nodes)
+                    .enter()
+                    .append("text")
+                    .attr("dy", 4).attr("dx", 20)
+                    .attr("font-size",16)
+                    .attr("font-weight","bold")
+                    .text(d=>d.id);
+
+                simulation.on("tick",()=>{
+                    link
+                        .attr("x1", d => d.source.x)
+                        .attr("y1", d => d.source.y)
+                        .attr("x2", d => d.target.x)
+                        .attr("y2", d => d.target.y);
+                    linkLabel
+                        .attr("x", d => (d.source.x + d.target.x)/2)
+                        .attr("y", d => (d.source.y + d.target.y)/2);
+                    node
+                        .attr("cx", d => d.x)
+                        .attr("cy", d => d.y);
+                    g.selectAll("text")
+                        .attr("x", d => d.x)
+                        .attr("y", d => d.y);
+                });
+
+                function dragstarted(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x; d.fy = d.y;
+                }
+                function dragged(event, d) {
+                    d.fx = event.x; d.fy = event.y;
+                }
+                function dragended(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null; d.fy = null;
+                }
             });
-        svg.call(zoom);
-
-        const simulation = d3.forceSimulation()
-            .force("link", d3.forceLink().id(d => d.id).distance(180))
-            .force("charge", d3.forceManyBody().strength(-600))
-            .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collision", d3.forceCollide().radius(60));
-
-        d3.json("/data").then(function(graph) {
-            // ✅ 创建连线
-            const link = g.append("g")
-                .attr("class", "links")
-                .selectAll("line")
-                .data(graph.links)
-                .enter().append("line")
-                .attr("class", "link")
-                // ✅ 使用平方根映射，使粗细差异更显著
-                .attr("stroke-width", d => Math.sqrt(d.value) * 3)
-                .attr("stroke", "#69b3a2");
-
-            // ✅ 添加连线上的文字标签（显示共同爱好数量）
-            const linkText = g.append("g")
-                .attr("class", "link-texts")
-                .selectAll("text")
-                .data(graph.links)
-                .enter().append("text")
-                .attr("class", "link-label")
-                .style("pointer-events", "none")
-                .style("text-anchor", "middle")
-                .text(d => d.commonCount); // 显示共同爱好数量
-
-            const node = g.append("g")
-                .attr("class", "nodes")
-                .selectAll("g")
-                .data(graph.nodes)
-                .enter().append("g")
-                .attr("class", "node")
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended));
-
-            node.append("circle")
-                .attr("r", 20)
-                .attr("fill", "#69b3a2");
-
-            node.append("text")
-                .attr("dx", 25)
-                .attr("dy", ".35em")
-                .text(d => d.name);
-
-            // 鼠标悬停显示全部兴趣
-            node.on("mouseover", function(event, d) {
-                d3.select(this).select("circle").transition().duration(200).attr("r", 25).attr("fill", "#ff7f0e");
-                d3.select(this).select("text").transition().duration(200).style("font-size", "16px");
-            })
-            .on("mouseout", function(event, d) {
-                d3.select(this).select("circle").transition().duration(200).attr("r", 20).attr("fill", "#69b3a2");
-                d3.select(this).select("text").transition().duration(200).style("font-size", "14px");
-            });
-
-            simulation
-                .nodes(graph.nodes)
-                .on("tick", ticked);
-
-            simulation.force("link")
-                .links(graph.links);
-
-            // ✅ 在 tick 中同时更新 线条 和 文本标签 的位置
-            function ticked() {
-                link
-                    .attr("x1", d => d.source.x)
-                    .attr("y1", d => d.source.y)
-                    .attr("x2", d => d.target.x)
-                    .attr("y2", d => d.target.y);
-
-                linkText
-                    .attr("x", d => (d.source.x + d.target.x) / 2)
-                    .attr("y", d => (d.source.y + d.target.y) / 2);
-
-                node
-                    .attr("transform", d => `translate(${d.x},${d.y})`);
-            }
-
-            function dragstarted(event, d) {
-                if (!event.active) simulation.alphaTarget(0.3).restart();
-                d.fx = d.x;
-                d.fy = d.y;
-            }
-
-            function dragged(event, d) {
-                d.fx = event.x;
-                d.fy = event.y;
-            }
-
-            function dragended(event, d) {
-                if (!event.active) simulation.alphaTarget(0);
-                d.fx = null;
-                d.fy = null;
-            }
-        });
+        }
+        // 初始化
+        changeNetwork('province');
     </script>
 </body>
 </html>
