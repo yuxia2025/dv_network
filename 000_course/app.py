@@ -114,6 +114,9 @@ def qrcode_image():
     img_str = b64encode(buffered.getvalue()).decode()
     return jsonify({'image': f'data:image/png;base64,{img_str}'})
 
-
+import os
 if __name__ == '__main__':
-    app.run(debug=True)
+    # app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+
