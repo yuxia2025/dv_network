@@ -1,0 +1,72 @@
+[
+  {
+    "nickname": "cc",
+    "interests": [
+      "badminton",
+      "swimming",
+      "33",
+      "game",
+      "frisbee"
+    ]
+  },
+  {
+    "nickname": "dd",
+    "interests": [
+      "badminton",
+      "22",
+      "11",
+      "dd",
+      "frisbee"
+    ]
+  },
+  {
+    "nickname": "aa",
+    "interests": [
+      "badminton",
+      "swimming",
+      "56",
+      "game",
+      "frisbee"
+    ]
+  },
+  {
+    "nickname": "rr",
+    "interests": [
+      "badminton",
+      "swimming",
+      "reading",
+      "dd",
+      "frisbee"
+    ]
+  },
+  {
+    "nickname": "xiaoxia",
+    "interests": [
+      "打球",
+      "看书",
+      "羽毛球",
+      "健身",
+      "锻炼"
+    ]
+  },
+  {
+    "nickname": "xiahong",
+    "interests": [
+      "reading",
+      "1",
+      "2",
+      "3",
+      "4"
+    ]
+  },
+  {
+    "nickname": "js",
+    "interests": [
+      "eating",
+      "drinking",
+      "sleeping",
+      "frisbee",
+      "hiking"
+    ]
+  }
+]

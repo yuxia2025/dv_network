@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>兴趣爱好网络图</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #f0f0f0; font-family: Arial, sans-serif; }
+        #graph { width: 100vw; height: 100vh; }
+        .node { cursor: pointer; }
+        .node text { pointer-events: none; font: 12px sans-serif; }
+        .link { stroke: #999; stroke-opacity: 0.6; }
+    </style>
+</head>
+<body>
+    <div id="graph"></div>
+    <script>
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        const svg = d3.select("#graph")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        const g = svg.append("g");
+
+        // 添加缩放功能
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 8])
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+        svg.call(zoom);
+
+        const simulation = d3.forceSimulation()
+            .force("link", d3.forceLink().id(d => d.id).distance(100))
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide().radius(60)); // 防止节点重叠
+
+        // 从 Flask 后端获取数据
+        d3.json("/data").then(function(graph) {
+            const link = g.append("g")
+                .attr("class", "links")
+                .selectAll("line")
+                .data(graph.links)
+                .enter().append("line")
+                .attr("class", "link")
+                .attr("stroke-width", d => Math.sqrt(d.value)); // 线条粗细与相似度相关
+
+            const node = g.append("g")
+                .attr("class", "nodes")
+                .selectAll("g")
+                .data(graph.nodes)
+                .enter().append("g")
+                .attr("class", "node");
+
+            // 创建圆形节点
+            node.append("circle")
+                .attr("r", 20)
+                .attr("fill", "#69b3a2")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            // 在节点上添加文字
+            node.append("text")
+                .attr("dx", 25)
+                .attr("dy", ".35em")
+                .text(d => d.name)
+                .style("font-weight", "bold");
+
+            // 鼠标悬停显示兴趣爱好
+            node.on("mouseover", function(event, d) {
+                d3.select(this).select("circle").transition().duration(200).attr("r", 25).attr("fill", "#ff7f0e");
+                d3.select(this).select("text").transition().duration(200).style("font-size", "14px");
+                // 可以在这里添加一个 tooltip 显示详细兴趣
+            })
+            .on("mouseout", function(event, d) {
+                d3.select(this).select("circle").transition().duration(200).attr("r", 20).attr("fill", "#69b3a2");
+                d3.select(this).select("text").transition().duration(200).style("font-size", "12px");
+            });
+
+            simulation
+                .nodes(graph.nodes)
+                .on("tick", ticked);
+
+            simulation.force("link")
+                .links(graph.links);
+
+            function ticked() {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            }
+
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        });
+    </script>
+</body>
+</html>
