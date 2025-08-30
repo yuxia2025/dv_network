@@ -34,7 +34,7 @@ def submit():
     nickname = data.get('nickname')
     interests = [i.strip().lower() for i in data.get('interests', []) if i.strip()]
 
-    if not nickname or len(interests) != 5:
+    if not nickname or len(interests) != 1:
         return jsonify({'error': '昵称和5个兴趣爱好都是必填项'}), 400
 
     # 读取现有用户
