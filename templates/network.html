@@ -5,9 +5,21 @@
     <title>兴趣网络图</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        /* 可加 network 图美化 */
         button { margin:8px; padding:6px 18px; }
         .link-label { font-size:12px; fill:#ff661a; pointer-events:none; }
+        #tooltip {
+            position: absolute;
+            visibility: hidden;
+            background: rgba(255,255,255,0.97);
+            border: 1.5px solid #666;
+            border-radius: 8px;
+            padding: 14px 20px;
+            font-size: 15px;
+            z-index: 9999;
+            box-shadow: 2px 4px 12px #888;
+            min-width: 120px;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -16,8 +28,11 @@
         <button onclick="changeNetwork('interest')" id="btn-interest">按兴趣</button>
     </div>
     <div id="graph"></div>
+    <div id="tooltip"></div>
     <script>
         let networkType = 'province';
+        const tooltip = d3.select("#tooltip");
+
         function changeNetwork(type) {
             networkType = type;
             document.getElementById('btn-province').disabled = (type === 'province');
@@ -53,7 +68,7 @@
                     .attr("class","link-label")
                     .text(d=>d.label);
 
-                // 节点
+                // 节点圆圈
                 const node = g.append("g")
                     .selectAll("circle")
                     .data(graph.nodes).enter()
@@ -64,15 +79,19 @@
                         .on("drag", dragged)
                         .on("end", dragended));
 
-                // 标签
-                g.append("g").selectAll("text")
+                // 标签(名字)
+                g.append("g").selectAll("text.username")
                     .data(graph.nodes)
                     .enter()
                     .append("text")
+                    .attr("class", "username")
                     .attr("dy", 4).attr("dx", 20)
                     .attr("font-size",16)
                     .attr("font-weight","bold")
-                    .text(d=>d.id);
+                    .style("cursor", "pointer")
+                    .text(d=>d.id)
+                    .on("click", showTooltip)
+                    .on("mouseleave", hideTooltip);
 
                 simulation.on("tick",()=>{
                     link
@@ -86,7 +105,7 @@
                     node
                         .attr("cx", d => d.x)
                         .attr("cy", d => d.y);
-                    g.selectAll("text")
+                    g.selectAll("text.username")
                         .attr("x", d => d.x)
                         .attr("y", d => d.y);
                 });
@@ -104,6 +123,26 @@
                 }
             });
         }
+
+        function showTooltip(event, d) {
+            // 不同 networkType 数据结构兼容
+            let province = d.province || '';
+            let interests = Array.isArray(d.interests) ? d.interests.join('、') : (d.interests || '');
+            const html = `
+                <div>
+                    <b>昵称：</b>${d.id}<br>
+                    ${province ? `<b>省份：</b>${province}<br>` : ''}
+                    ${interests ? `<b>兴趣：</b>${interests}` : ''}
+                </div>`;
+            tooltip.html(html)
+                .style("top", (event.pageY+20) + "px")
+                .style("left", (event.pageX+20) + "px")
+                .style("visibility", "visible");
+        }
+        function hideTooltip() {
+            tooltip.style("visibility", "hidden");
+        }
+
         // 初始化
         changeNetwork('province');
     </script>
