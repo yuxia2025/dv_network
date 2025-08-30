@@ -10,110 +10,110 @@ DATA_FILE = 'users.json'
 
 # 确保数据文件存在
 if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, 'w') as f:
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump([], f)
 
-
 def calculate_jaccard(set1, set2):
-    """计算两个集合的 Jaccard 相似度"""
     intersection = set1.intersection(set2)
     union = set1.union(set2)
     return len(intersection) / len(union) if union else 0
 
-
 @app.route('/')
 def form():
-    """渲染表单页面"""
     return render_template('form.html')
-
 
 @app.route('/submit', methods=['POST'])
 def submit():
-    """处理表单提交"""
     data = request.json
-    nickname = data.get('nickname')
-    interests = [i.strip().lower() for i in data.get('interests', []) if i.strip()]
+    nickname = data.get('nickname', '').strip()
+    province = data.get('province', '').strip()
+    interests = [i.strip() for i in data.get('interests', []) if i.strip()]
+    # 校验省份和兴趣格式
+    if not nickname or not province or len(interests) != 2:
+        return jsonify({'error': '所有字段都是必填的！'}), 400
+    if any(word in province for word in ["省", "市", "自治区"]):
+        return jsonify({'error': '省份不能包含“省/市/自治区”等字样'}), 400
+    if interests[0] == interests[1]:
+        return jsonify({'error': '两个兴趣爱好不能相同！'}), 400
+    if not all(len(i) == 2 for i in interests):
+        return jsonify({'error': '兴趣爱好必须为两个字'}), 400
 
-    if not nickname or len(interests) != 1:
-        return jsonify({'error': '昵称和5个兴趣爱好都是必填项'}), 400
-
-    # 读取现有用户
-    with open(DATA_FILE, 'r') as f:
-        users = json.load(f)
-
-    # 检查昵称是否已存在（可选）
-    if any(user['nickname'].lower() == nickname.lower() for user in users):
+    # 加载并写入数据
+    try:
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            users = json.load(f)
+    except:
+        users = []
+    # （可选：昵称唯一）
+    if any(user['nickname'] == nickname for user in users):
         return jsonify({'error': '该昵称已存在，请换一个'}), 400
-
-    # 添加新用户
-    users.append({'nickname': nickname, 'interests': interests})
-    with open(DATA_FILE, 'w') as f:
-        json.dump(users, f, indent=2, ensure_ascii=False)
-
+    users.append({'nickname': nickname, 'province': province, 'interests': interests})
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(users, f, ensure_ascii=False)
     return jsonify({'message': '提交成功！'})
-
-
-@app.route('/network')
-def network():
-    """渲染网络图页面"""
-    return render_template('network.html')
-
 
 @app.route('/data')
 def get_data():
-    """为 D3.js 提供网络图数据"""
-    with open(DATA_FILE, 'r') as f:
+    type_choice = request.args.get('type', 'province')
+    with open(DATA_FILE, 'r', encoding='utf-8') as f:
         users = json.load(f)
 
     nodes = []
     links = []
 
-    # 创建节点
-    for user in users:
-        nodes.append({
-            'id': user['nickname'],
-            'name': user['nickname'],
-            'interests': user['interests']
-        })
-
-    # 创建边（基于 Jaccard 相似度）
-    threshold = 0.0  # 即使只有1个共同兴趣也连接
-    for i, user1 in enumerate(users):
-        for j, user2 in enumerate(users):
-            if i >= j:  # 避免重复和自连
-                continue
-            set1 = set(user1['interests'])
-            set2 = set(user2['interests'])
-            intersection = set1.intersection(set2)
-            similarity = calculate_jaccard(set1, set2)
-            if similarity > threshold:
-                links.append({
-                    'source': user1['nickname'],
-                    'target': user2['nickname'],
-                    'value': (similarity ** 2) * 20,  # ✅ 平方放大，增强粗细对比
-                    'commonCount': len(intersection)   # ✅ 返回共同爱好数量
-                })
-
+    if type_choice == 'province':
+        province_users = {}
+        for user in users:
+            province_users.setdefault(user['province'], []).append(user['nickname'])
+            nodes.append({'id': user['nickname'], 'province': user['province']})
+        # 省内两两连线
+        for province, names in province_users.items():
+            for i in range(len(names)):
+                for j in range(i+1, len(names)):
+                    links.append({
+                        'source': names[i], 'target': names[j], 'label': province
+                    })
+    else:  # 基于兴趣
+        nodes = [{'id': user['nickname'], 'interests': user['interests']} for user in users]
+        for i, u1 in enumerate(users):
+            for j, u2 in enumerate(users):
+                if i >= j:
+                    continue
+                common = set(u1.get('interests', [])) & set(u2.get('interests', []))
+                if common:
+                    links.append({
+                        'source': u1['nickname'],
+                        'target': u2['nickname'],
+                        'label': ','.join(common)
+                    })
     return jsonify({'nodes': nodes, 'links': links})
 
+@app.route('/network')
+def network():
+    return render_template('network.html')
 
 @app.route('/qrcode')
 def qrcode_image():
-    """生成并返回二维码图片"""
-    # 🚨 请将此URL修改为你的实际公网地址，例如：
-    # url = "https://your-app.up.railway.app"
-    url = "http://localhost:5000"  # 本地测试用，部署后必须修改！
+    # 替换成你的实际线上网址！
+    url = "https://dv-network-production.up.railway.app"
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(url)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
-
-    # 将图片转换为 base64 字符串
     buffered = BytesIO()
     img.save(buffered, format="PNG")
     img_str = b64encode(buffered.getvalue()).decode()
     return jsonify({'image': f'data:image/png;base64,{img_str}'})
 
+# 可选（调试用）：查看所有数据
+@app.route('/view-data')
+def view_data():
+    try:
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify({'count': len(data), 'users': data})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
