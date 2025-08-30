@@ -24,18 +24,20 @@
 </head>
 <body>
     <div id="app" class="container">
-        <h1>兴趣爱好调查</h1>
+        <h1>小调查</h1>
         <form @submit.prevent="submitForm">
             <div class="form-group">
-                <label for="nickname">昵称:</label>
-                <input type="text" id="nickname" v-model="nickname" placeholder="请输入你的昵称">
+                <label for="province">省份（如：广东）</label>
+                <input type="text" id="province" v-model="province" placeholder="如：广东" maxlength="10">
+                <small style="color:grey;">请严格输入地名，如：广东，不要加“省”</small>
             </div>
             <div class="form-group">
-                <label>请列出5个你的兴趣爱好:</label>
-                <input type="text" v-for="(interest, index) in interests" 
-                       :key="index" 
-                       v-model="interests[index]" 
-                       :placeholder="'爱好 ' + (index + 1)">
+                <label for="interest1">兴趣爱好 1（两个字）:</label>
+                <input type="text" id="interest1" v-model="interests[0]" placeholder="如：电影" maxlength="2">
+            </div>
+            <div class="form-group">
+                <label for="interest2">兴趣爱好 2（两个字）:</label>
+                <input type="text" id="interest2" v-model="interests[1]" placeholder="如：音乐" maxlength="2">
             </div>
             <button type="submit">提交</button>
         </form>
@@ -56,7 +58,8 @@
             data() {
                 return {
                     nickname: '',
-                    interests: ['', '', '', '', ''],
+                    province: '',
+                    interests: ['', ''],
                     errorMessage: '',
                     successMessage: '',
                     qrcodeImage: ''
@@ -66,18 +69,29 @@
                 submitForm() {
                     this.errorMessage = '';
                     this.successMessage = '';
-                    if (!this.nickname || this.interests.some(i => !i.trim())) {
-                        this.errorMessage = '所有字段都是必填的！';
+            
+                    // 校验省份
+                    if (!this.province.trim() || /省|市|自治区/.test(this.province.trim())) {
+                        this.errorMessage = '省份格式不对（不要加“省”等）';
                         return;
                     }
+                    // 校验兴趣
+                    if (!this.interests[0].trim() || !this.interests[1].trim() ||
+                        this.interests[0].trim().length !== 2 || this.interests[1].trim().length !== 2) {
+                        this.errorMessage = '兴趣必须恰好两个字且不能为空！';
+                        return;
+                    }
+            
                     axios.post('/submit', {
                         nickname: this.nickname,
-                        interests: this.interests
+                        province: this.province.trim(),
+                        interests: this.interests.map(i => i.trim())
                     })
                     .then(response => {
                         this.successMessage = response.data.message;
                         this.nickname = '';
-                        this.interests = ['', '', '', '', ''];
+                        this.province = '';
+                        this.interests = ['', ''];
                     })
                     .catch(error => {
                         this.errorMessage = error.response?.data?.error || '提交失败，请重试。';
