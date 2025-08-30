@@ -27,6 +27,10 @@
         <h1>小调查</h1>
         <form @submit.prevent="submitForm">
             <div class="form-group">
+                <label for="province">姓名或昵称</label>
+                <input type="text" id="province" v-model="province" placeholder="如：广东" maxlength="10">
+            </div>
+            <div class="form-group">
                 <label for="province">省份（如：广东）</label>
                 <input type="text" id="province" v-model="province" placeholder="如：广东" maxlength="10">
                 <small style="color:grey;">请严格输入地名，如：广东，不要加“省”</small>
